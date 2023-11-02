@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 
 @Service
 @Slf4j
-public class CpuService {
+public class MetricService {
 
     public Map<String, Double> cpu_코어수(String metricData) {
         Map<String, Double> result = new HashMap<>();
@@ -62,6 +62,30 @@ public class CpuService {
         }
         return result;
     }
+
+    public Map<String, Integer> memory_사용량(String metricData) {
+        Map<String, Integer> result = new HashMap<>();
+
+        Pattern pattern = Pattern.compile("libvirt_domain_info_memory_usage_bytes\\{[^}]*\\} ([0-9.]+)");
+
+        Matcher matcher = pattern.matcher(metricData);
+
+        while (matcher.find()) {
+            try {
+                double value = Double.parseDouble(matcher.group(1)) * 100000000;
+                String projectId = extractProjectId(matcher.group(0));
+
+                if (projectId != null) {
+                    result.put(projectId, (int)value);
+                }
+            } catch (NumberFormatException e) {
+                log.error("Error parsing memory usage metric value", e);
+            }
+        }
+
+        return result;
+    }
+
 
     public String extractProjectId(String metricData) {
         // 정규식 패턴 변경

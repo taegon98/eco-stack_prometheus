@@ -2,7 +2,7 @@ package openstack.eco_stack.controller;
 
 import lombok.extern.slf4j.Slf4j;
 import openstack.eco_stack.domain.Token;
-import openstack.eco_stack.service.CpuService;
+import openstack.eco_stack.service.MetricService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -22,16 +22,16 @@ import java.util.regex.Pattern;
 public class PrometheusDataFetcher {
 
     private final RestTemplate restTemplate;
-    private final CpuService cpuService;
+    private final MetricService metricService;
 
     @Autowired
-    public PrometheusDataFetcher(RestTemplateBuilder restTemplateBuilder, CpuService cpuService) {
+    public PrometheusDataFetcher(RestTemplateBuilder restTemplateBuilder, MetricService metricService) {
         this.restTemplate = restTemplateBuilder.build();
-        this.cpuService = cpuService;
+        this.metricService = metricService;
     }
 
     @GetMapping("/prometheus-metrics")
-    public ResponseEntity<String> getPrometheusMetrics() throws URISyntaxException {
+    public ResponseEntity<String> getPrometheusMetrics() throws URISyntaxException, InterruptedException {
         String metricData = fetchMetricsData();
         String AUTH_TOKEN = new Token(new RestTemplateBuilder()).fetchToken();
 
@@ -57,18 +57,25 @@ public class PrometheusDataFetcher {
             result.append("Instance Name: ").append(instanceName).append("\n");
             result.append("Project Id: ").append(projectId).append("\n");
             result.append("Project Info: ").append(projectData).append("\n");
-            Map<String, Double> cpu_사용시간 = cpuService.cpu_사용시간(metricData);
-            Map<String, Double> cpu_코어수 = cpuService.cpu_코어수(metricData);
+            Map<String, Double> cpu_사용시간 = metricService.cpu_사용시간(metricData);
+            Map<String, Double> cpu_코어수 = metricService.cpu_코어수(metricData);
+            Map<String, Integer> memory_사용량 = metricService.memory_사용량(metricData);
 
-            log.info("Number of Cores:");
-            for (Map.Entry<String, Double> mp : cpu_코어수.entrySet()) {
-                log.info("Project ID: " + mp.getKey() + ", CPU Metric: " + mp.getValue());
+            log.info("CPU Core Count:");
+            for (Map.Entry<String, Double> entry : cpu_코어수.entrySet()) {
+                log.info("Project ID: " + entry.getKey() + ", Core Count: " + entry.getValue());
             }
 
-            log.info("Usage Time:");
+            log.info("CPU Usage Time:");
             for (Map.Entry<String, Double> entry : cpu_사용시간.entrySet()) {
-                log.info("Project ID: " + entry.getKey() + ", Virtual CPU Metric: " + entry.getValue());
+                log.info("Project ID: " + entry.getKey() + ", CPU Usage Time: " + entry.getValue());
             }
+
+            log.info("Memory Usage Gauge:");
+            for (Map.Entry<String, Integer> entry : memory_사용량.entrySet()) {
+                log.info("Project ID: " + entry.getKey() + ", Memory Usage: " + entry.getValue() + " bytes");
+            }
+            Thread.sleep(5000);
         }
         return ResponseEntity.ok(result.toString());
     }
