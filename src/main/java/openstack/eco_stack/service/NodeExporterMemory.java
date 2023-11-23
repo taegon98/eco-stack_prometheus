@@ -1,4 +1,4 @@
-package openstack.eco_stack.controller;
+package openstack.eco_stack.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
