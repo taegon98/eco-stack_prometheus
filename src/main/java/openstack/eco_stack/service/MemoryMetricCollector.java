@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import openstack.eco_stack.model.Metric;
+import openstack.eco_stack.model.MetricValue;
+import openstack.eco_stack.model.MetricValues;
 import openstack.eco_stack.repository.MetricRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,6 +14,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 @RequiredArgsConstructor
@@ -22,20 +26,28 @@ public class MemoryMetricCollector implements MetricCollector{
     private final MetricRepository metricRepository;
     private final String metricType = "Memory Utilization";
 
-    @Scheduled(cron = "0 0 0 * * *")
+//    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(fixedRate = 5000)
     public void collectMetric() {
         RestTemplate restTemplate = new RestTemplate();
         long endTime = now.toEpochSecond();
         long startTime = oneDayAgo.toEpochSecond();
+        MetricValues metricValues = MetricValues.builder().build();
 
         while (startTime < endTime) {
             double memoryUtilization = calculateHourlyMemoryUtilization(restTemplate, prometheusUrl, startTime);
             ZonedDateTime hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), seoulZoneId);
 //            log.info("[{}] Memory Utilization: {}%", hour, memoryUtilization); //[hour: 수집 시각, memoryUtilization: memory 사용률]
-            saveMetric(hour, memoryUtilization);
+            MetricValue metricValue = MetricValue.builder()
+                    .dateTime(hour.toInstant())
+                    .value(memoryUtilization)
+                    .build();
+            metricValues.add(metricValue);
 
             startTime += 3600;
         }
+
+        saveMetric(metricValues);
     }
 
     private double calculateHourlyMemoryUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime) {
@@ -92,11 +104,11 @@ public class MemoryMetricCollector implements MetricCollector{
         return 100 * (1 - ((memFree + memCached + memBuffers) / memTotal));
     }
 
-    private void saveMetric(ZonedDateTime time, double value) {
+    private void saveMetric(MetricValues metricValues) {
         Metric metric = Metric.builder()
                 .name(metricType)
-                .dateTime(time.toInstant())
-                .value(value)
+                .date(LocalDate.now(seoulZoneId))
+                .metricValues(metricValues)
                 .build();
 
         metricRepository.save(metric);

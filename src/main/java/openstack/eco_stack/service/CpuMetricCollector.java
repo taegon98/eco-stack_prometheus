@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import openstack.eco_stack.model.Metric;
+import openstack.eco_stack.model.MetricValue;
+import openstack.eco_stack.model.MetricValues;
 import openstack.eco_stack.repository.MetricRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -15,6 +17,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 
 @RequiredArgsConstructor
@@ -26,11 +29,13 @@ public class CpuMetricCollector implements MetricCollector{
     private final String metricType = "CPU Utilization";
     private final int NUMBER_OF_CPU = 4;
 
-    @Scheduled(cron = "0 0 0 * * *")
+//    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(fixedRate = 5000)
     public void collectMetric() throws UnsupportedEncodingException {
         RestTemplate restTemplate = new RestTemplate();
         long endTime = now.toEpochSecond();
         long startTime = oneDayAgo.toEpochSecond();
+        MetricValues metricValues = MetricValues.builder().build();
 
         while (startTime < endTime) {
             double cpuUtilizationAvg = 0;
@@ -43,10 +48,16 @@ public class CpuMetricCollector implements MetricCollector{
             }
             cpuUtilizationAvg /= NUMBER_OF_CPU;
 
-            saveMetric(hour, cpuUtilizationAvg);
+            MetricValue metricValue = MetricValue.builder()
+                    .dateTime(hour.toInstant())
+                    .value(cpuUtilizationAvg)
+                    .build();
+            metricValues.add(metricValue);
 
             startTime += 3600;
         }
+
+        saveMetric(metricValues);
     }
 
     private double fetchAndCalculateCPUUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu) throws UnsupportedEncodingException {
@@ -88,11 +99,11 @@ public class CpuMetricCollector implements MetricCollector{
         return 0.0;
     }
 
-    private void saveMetric(ZonedDateTime time, double value) {
+    private void saveMetric(MetricValues metricValues) {
         Metric metric = Metric.builder()
                 .name(metricType)
-                .dateTime(time.toInstant())
-                .value(value)
+                .date(LocalDate.now(seoulZoneId))
+                .metricValues(metricValues)
                 .build();
 
         metricRepository.save(metric);

@@ -6,8 +6,7 @@ import lombok.ToString;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.time.Instant;
-import java.time.ZonedDateTime;
+import java.time.LocalDate;
 
 @ToString
 @Builder
@@ -18,6 +17,6 @@ public class Metric {
     @Id
     private String id;
     private String name;
-    private Instant dateTime;
-    private Double value;
+    private LocalDate date;
+    private MetricValues metricValues;
 }
