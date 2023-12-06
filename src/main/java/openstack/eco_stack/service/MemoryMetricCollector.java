@@ -4,16 +4,18 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.time.ZonedDateTime;
 
 @Component
 @Slf4j
 public class MemoryMetricCollector implements MetricCollector{
 
+    @Scheduled(fixedRate = 5000)
     public void collectMetric() {
         RestTemplate restTemplate = new RestTemplate();
         long endTime = now.toEpochSecond();

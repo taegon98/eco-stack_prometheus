@@ -23,6 +23,7 @@ import java.time.ZonedDateTime;
 public class CpuMetricCollector implements MetricCollector{
 
     private final MetricRepository metricRepository;
+    private final String metricType = "CPU Utilization";
     private final int NUMBER_OF_CPU = 4;
 
     @Scheduled(cron = "0 0 0 * * *")
@@ -43,7 +44,7 @@ public class CpuMetricCollector implements MetricCollector{
             cpuUtilizationAvg /= NUMBER_OF_CPU;
 
             Metric metric = Metric.builder()
-                    .name("CPU Utilization")
+                    .name(metricType)
                     .dateTime(hour.toInstant())
                     .value(cpuUtilizationAvg)
                     .build();
