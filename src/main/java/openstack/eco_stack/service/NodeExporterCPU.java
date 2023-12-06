@@ -2,9 +2,15 @@ package openstack.eco_stack.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import openstack.eco_stack.model.Metric;
+import openstack.eco_stack.repository.MetricRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
@@ -12,10 +18,15 @@ import java.net.URISyntaxException;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
+@RequiredArgsConstructor
+@Component
 @Slf4j
 public class NodeExporterCPU {
 
-    public static void main(String[] args) throws UnsupportedEncodingException {
+    private final MetricRepository metricRepository;
+
+    @Scheduled(cron = "0 0 0 * * *")
+    public void collectMetric() throws UnsupportedEncodingException {
         RestTemplate restTemplate = new RestTemplate();
 
         String prometheusUrl = "http://133.186.215.103:9090";
@@ -39,11 +50,18 @@ public class NodeExporterCPU {
             }
             cpuUtilizationAvg /= NUMBER_OF_CPU;
 
-            log.info("[{}] {} : {} %", hour, "CPU Utilization Average", cpuUtilizationAvg);
+//            log.info("[{}] {} : {} %", hour, "CPU Utilization Average", cpuUtilizationAvg);
+            log.info("{}", hour);
+            Metric metric = Metric.builder()
+                    .name("CPU Utilization")
+                    .dateTime(hour.toInstant())
+                    .value(cpuUtilizationAvg)
+                    .build();
+
+            metricRepository.save(metric);
 
             startTime += 3600;
         }
-
     }
 
     private static double fetchAndCalculateCPUUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu) throws UnsupportedEncodingException {
