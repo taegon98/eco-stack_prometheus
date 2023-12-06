@@ -4,24 +4,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
-import java.time.ZoneId;
+import java.io.UnsupportedEncodingException;
 import java.time.ZonedDateTime;
 
+@Component
 @Slf4j
-public class NodeExporterMemory {
+public class MemoryMetricCollector implements MetricCollector{
 
-    public static void main(String[] args) {
+    public void collectMetric() {
         RestTemplate restTemplate = new RestTemplate();
-        String prometheusUrl = "http://133.186.215.103:9090";
-
-        ZoneId seoulZoneId = ZoneId.of("Asia/Seoul");
-        ZonedDateTime now = ZonedDateTime.now(seoulZoneId);
-        ZonedDateTime oneHourAgo = now.minusHours(24);
-
         long endTime = now.toEpochSecond();
-        long startTime = oneHourAgo.toEpochSecond();
+        long startTime = oneDayAgo.toEpochSecond();
 
         while (startTime < endTime) {
             double memoryUtilization = calculateHourlyMemoryUtilization(restTemplate, prometheusUrl, startTime);

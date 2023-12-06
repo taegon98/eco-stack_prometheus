@@ -15,29 +15,21 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 @RequiredArgsConstructor
 @Component
 @Slf4j
-public class NodeExporterCPU {
+public class CpuMetricCollector implements MetricCollector{
 
     private final MetricRepository metricRepository;
+    private final int NUMBER_OF_CPU = 4;
 
     @Scheduled(cron = "0 0 0 * * *")
     public void collectMetric() throws UnsupportedEncodingException {
         RestTemplate restTemplate = new RestTemplate();
-
-        String prometheusUrl = "http://133.186.215.103:9090";
-        String region = "Asia/Seoul";
-        ZoneId seoulZoneId = ZoneId.of(region);
-        ZonedDateTime now = ZonedDateTime.now(seoulZoneId);
-        ZonedDateTime oneHourAgo = now.minusHours(24);
-
         long endTime = now.toEpochSecond();
-        long startTime = oneHourAgo.toEpochSecond();
-        final int NUMBER_OF_CPU = 4;
+        long startTime = oneDayAgo.toEpochSecond();
 
         while (startTime < endTime) {
             double cpuUtilizationAvg = 0;
@@ -50,8 +42,6 @@ public class NodeExporterCPU {
             }
             cpuUtilizationAvg /= NUMBER_OF_CPU;
 
-//            log.info("[{}] {} : {} %", hour, "CPU Utilization Average", cpuUtilizationAvg);
-            log.info("{}", hour);
             Metric metric = Metric.builder()
                     .name("CPU Utilization")
                     .dateTime(hour.toInstant())
@@ -64,7 +54,7 @@ public class NodeExporterCPU {
         }
     }
 
-    private static double fetchAndCalculateCPUUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu) throws UnsupportedEncodingException {
+    private double fetchAndCalculateCPUUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu) throws UnsupportedEncodingException {
         String query = "avg without (mode,cpu) (1 - rate(node_cpu_seconds_total{cpu=\"" + cpu + "\", mode=\"idle\"}[1h]))";
         String encodedQuery = java.net.URLEncoder.encode(query, "UTF-8");
         URI uri;
@@ -79,7 +69,7 @@ public class NodeExporterCPU {
         return extractCPUUtilization(response, cpu);
     }
 
-    private static double extractCPUUtilization(ResponseEntity<String> response, int cpu) {
+    private double extractCPUUtilization(ResponseEntity<String> response, int cpu) {
         if (response.getStatusCode().is2xxSuccessful()) {
             String responseBody = response.getBody();
             ObjectMapper objectMapper = new ObjectMapper();
