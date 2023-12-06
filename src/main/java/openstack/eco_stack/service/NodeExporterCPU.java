@@ -26,18 +26,18 @@ public class NodeExporterCPU {
 
         long endTime = now.toEpochSecond();
         long startTime = oneHourAgo.toEpochSecond();
-        final int NUMBEROFCPU = 4;
+        final int NUMBER_OF_CPU = 4;
 
         while (startTime < endTime) {
             double cpuUtilizationAvg = 0;
             ZonedDateTime hour = null;
-            for (int cpuNumber = 0; cpuNumber < NUMBEROFCPU; cpuNumber++) {
+            for (int cpuNumber = 0; cpuNumber < NUMBER_OF_CPU; cpuNumber++) {
                 double cpuUtilization = fetchAndCalculateCPUUtilization(restTemplate, prometheusUrl, startTime, cpuNumber);
                 hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), seoulZoneId);
                 cpuUtilizationAvg += cpuUtilization;
-                log.info("[{}] CPU {} Utilization: {}%", hour, cpuNumber, cpuUtilization); //[hour: 수집 시각, cpuNUmber: cpuNUmber 번호, cpuUtilization: CPU 사용률]
+//                log.info("[{}] CPU {} Utilization: {}%", hour, cpuNumber, cpuUtilization); //[hour: 수집 시각, cpuNUmber: cpuNUmber 번호, cpuUtilization: CPU 사용률]
             }
-            cpuUtilizationAvg /= NUMBEROFCPU;
+            cpuUtilizationAvg /= NUMBER_OF_CPU;
 
             log.info("[{}] {} : {} %", hour, "CPU Utilization Average", cpuUtilizationAvg);
 
