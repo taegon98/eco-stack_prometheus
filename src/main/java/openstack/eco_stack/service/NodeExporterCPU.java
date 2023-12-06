@@ -17,26 +17,33 @@ public class NodeExporterCPU {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         RestTemplate restTemplate = new RestTemplate();
-        String prometheusUrl = "http://133.186.215.103:9090";
 
-        ZoneId seoulZoneId = ZoneId.of("Asia/Seoul");
+        String prometheusUrl = "http://133.186.215.103:9090";
+        String region = "Asia/Seoul";
+        ZoneId seoulZoneId = ZoneId.of(region);
         ZonedDateTime now = ZonedDateTime.now(seoulZoneId);
         ZonedDateTime oneHourAgo = now.minusHours(24);
 
         long endTime = now.toEpochSecond();
         long startTime = oneHourAgo.toEpochSecond();
-
-        int numberOfCPUs = 4; // CPU 수
+        final int NUMBEROFCPU = 4;
 
         while (startTime < endTime) {
-            for (int cpu = 0; cpu < numberOfCPUs; cpu++) {
-                double cpuUtilization = fetchAndCalculateCPUUtilization(restTemplate, prometheusUrl, startTime, cpu);
-                ZonedDateTime hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), seoulZoneId);
-                log.info("[{}] CPU {} Utilization: {}%", hour, cpu, cpuUtilization); //[hour: 수집 시각, cpu: cpu 번호, cpuUtilization: CPU 사용률]
+            double cpuUtilizationAvg = 0;
+            ZonedDateTime hour = null;
+            for (int cpuNumber = 0; cpuNumber < NUMBEROFCPU; cpuNumber++) {
+                double cpuUtilization = fetchAndCalculateCPUUtilization(restTemplate, prometheusUrl, startTime, cpuNumber);
+                hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), seoulZoneId);
+                cpuUtilizationAvg += cpuUtilization;
+                log.info("[{}] CPU {} Utilization: {}%", hour, cpuNumber, cpuUtilization); //[hour: 수집 시각, cpuNUmber: cpuNUmber 번호, cpuUtilization: CPU 사용률]
             }
+            cpuUtilizationAvg /= NUMBEROFCPU;
+
+            log.info("[{}] {} : {} %", hour, "CPU Utilization Average", cpuUtilizationAvg);
 
             startTime += 3600;
         }
+
     }
 
     private static double fetchAndCalculateCPUUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu) throws UnsupportedEncodingException {
