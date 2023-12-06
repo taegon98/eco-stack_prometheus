@@ -100,7 +100,5 @@ public class MemoryMetricCollector implements MetricCollector{
                 .build();
 
         metricRepository.save(metric);
-
-        log.info("Execute Save");
     }
 }
