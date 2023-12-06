@@ -43,13 +43,7 @@ public class CpuMetricCollector implements MetricCollector{
             }
             cpuUtilizationAvg /= NUMBER_OF_CPU;
 
-            Metric metric = Metric.builder()
-                    .name(metricType)
-                    .dateTime(hour.toInstant())
-                    .value(cpuUtilizationAvg)
-                    .build();
-
-            metricRepository.save(metric);
+            saveMetric(hour, cpuUtilizationAvg);
 
             startTime += 3600;
         }
@@ -92,5 +86,15 @@ public class CpuMetricCollector implements MetricCollector{
             log.error("Error fetching data for CPU {}. Response code: {}", cpu, response.getStatusCode());
         }
         return 0.0;
+    }
+
+    private void saveMetric(ZonedDateTime time, double value) {
+        Metric metric = Metric.builder()
+                .name(metricType)
+                .dateTime(time.toInstant())
+                .value(value)
+                .build();
+
+        metricRepository.save(metric);
     }
 }
