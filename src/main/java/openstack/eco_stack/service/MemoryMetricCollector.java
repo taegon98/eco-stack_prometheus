@@ -26,8 +26,7 @@ public class MemoryMetricCollector implements MetricCollector{
     private final MetricRepository metricRepository;
     private final String metricType = "Memory Utilization";
 
-//    @Scheduled(cron = "0 0 0 * * *")
-    @Scheduled(fixedRate = 5000)
+    @Scheduled(cron = "0 0 0 * * *")
     public void collectMetric() {
         RestTemplate restTemplate = new RestTemplate();
         long endTime = now.toEpochSecond();
