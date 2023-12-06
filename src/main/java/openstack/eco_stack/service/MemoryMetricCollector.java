@@ -2,7 +2,10 @@ package openstack.eco_stack.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import openstack.eco_stack.model.Metric;
+import openstack.eco_stack.repository.MetricRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -11,9 +14,13 @@ import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 
+@RequiredArgsConstructor
 @Component
 @Slf4j
 public class MemoryMetricCollector implements MetricCollector{
+
+    private final MetricRepository metricRepository;
+    private final String metricType = "Memory Utilization";
 
     @Scheduled(fixedRate = 5000)
     public void collectMetric() {
@@ -24,13 +31,14 @@ public class MemoryMetricCollector implements MetricCollector{
         while (startTime < endTime) {
             double memoryUtilization = calculateHourlyMemoryUtilization(restTemplate, prometheusUrl, startTime);
             ZonedDateTime hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), seoulZoneId);
-            log.info("[{}] Memory Utilization: {}%", hour, memoryUtilization); //[hour: 수집 시각, memoryUtilization: memory 사용률]
+//            log.info("[{}] Memory Utilization: {}%", hour, memoryUtilization); //[hour: 수집 시각, memoryUtilization: memory 사용률]
+            saveMetric(hour, memoryUtilization);
 
             startTime += 3600;
         }
     }
 
-    private static double calculateHourlyMemoryUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime) {
+    private double calculateHourlyMemoryUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime) {
         String memFreeQuery = prometheusUrl + "/api/v1/query?" +
                 "query=avg_over_time(node_memory_MemFree_bytes[60m])" +
                 "&time=" + startTime;
@@ -51,12 +59,12 @@ public class MemoryMetricCollector implements MetricCollector{
 
         double memoryUtilization = calculateMemoryUtilization(memFree, memCached, memBuffers, memTotal);
 
-        log.info("Memory Free: {}, Memory Cached: {}, Memory Buffers: {}, Memory Total: {}", memFree, memCached, memBuffers, memTotal);
+//        log.info("Memory Free: {}, Memory Cached: {}, Memory Buffers: {}, Memory Total: {}", memFree, memCached, memBuffers, memTotal);
 
         return memoryUtilization;
     }
 
-    private static double extractValue(ResponseEntity<String> response) {
+    private double extractValue(ResponseEntity<String> response) {
         if (response.getStatusCode().is2xxSuccessful()) {
             String result = response.getBody();
             ObjectMapper objectMapper = new ObjectMapper();
@@ -82,5 +90,17 @@ public class MemoryMetricCollector implements MetricCollector{
 
     private static double calculateMemoryUtilization(double memFree, double memCached, double memBuffers, double memTotal) {
         return 100 * (1 - ((memFree + memCached + memBuffers) / memTotal));
+    }
+
+    private void saveMetric(ZonedDateTime time, double value) {
+        Metric metric = Metric.builder()
+                .name(metricType)
+                .dateTime(time.toInstant())
+                .value(value)
+                .build();
+
+        metricRepository.save(metric);
+
+        log.info("Execute Save");
     }
 }
