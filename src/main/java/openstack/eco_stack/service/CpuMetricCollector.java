@@ -4,10 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import openstack.eco_stack.model.HypervisorInstanceMetric;
 import openstack.eco_stack.model.InstanceMetric;
 import openstack.eco_stack.model.MetricValue;
 import openstack.eco_stack.model.MetricValues;
-import openstack.eco_stack.repository.MetricRepository;
+import openstack.eco_stack.repository.HypervisorInstanceMetricRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -25,7 +26,7 @@ import java.time.ZonedDateTime;
 @Slf4j
 public class CpuMetricCollector implements MetricCollector{
 
-    private final MetricRepository metricRepository;
+    private final HypervisorInstanceMetricRepository hypervisorInstanceMetricRepository;
     private final String metricType = "CPU Utilization";
     private final int NUMBER_OF_CPU = 4;
 
@@ -99,12 +100,12 @@ public class CpuMetricCollector implements MetricCollector{
     }
 
     private void saveMetric(MetricValues metricValues) {
-        InstanceMetric instanceMetric = InstanceMetric.builder()
+        HypervisorInstanceMetric instanceMetric = HypervisorInstanceMetric.builder()
                 .name(metricType)
                 .date(LocalDate.now(seoulZoneId))
                 .metricValues(metricValues)
                 .build();
 
-        metricRepository.save(instanceMetric);
+        hypervisorInstanceMetricRepository.save(instanceMetric);
     }
 }
