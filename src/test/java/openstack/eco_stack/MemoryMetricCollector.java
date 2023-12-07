@@ -1,4 +1,4 @@
-package openstack.eco_stack.service;
+package openstack.eco_stack;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,29 +9,27 @@ import openstack.eco_stack.repository.CloudInstanceRepository;
 import openstack.eco_stack.repository.CloudProjectRepository;
 import openstack.eco_stack.repository.HypervisorInstanceMetricRepository;
 import openstack.eco_stack.repository.HypervisorRepository;
+import openstack.eco_stack.service.MetricCollector;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.ZonedDateTime;
-import java.util.Optional;
 
 @RequiredArgsConstructor
 @Component
 @Slf4j
-public class MemoryMetricCollector implements MetricCollector{
+public class MemoryMetricCollector implements MetricCollector {
 
+    public static void main(String[] args) {
+
+    }
     private final CloudInstanceRepository cloudInstanceRepository;
     private final HypervisorInstanceMetricRepository hypervisorInstanceMetricRepository;
     private final CloudProjectRepository cloudProjectRepository;
     private final HypervisorRepository hypervisorRepository;
     private final String metricType = "Memory Utilization";
 
-    //@Scheduled(cron = "0 0 0 * * *")
-    @Scheduled(fixedRate = 5000)
     public void collectMetric() {
         RestTemplate restTemplate = new RestTemplate();
         long endTime = now.toEpochSecond();
@@ -50,8 +48,6 @@ public class MemoryMetricCollector implements MetricCollector{
 
             startTime += 3600;
         }
-
-        saveMetric(metricValues);
     }
 
     private double calculateHourlyMemoryUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime) {
@@ -75,7 +71,7 @@ public class MemoryMetricCollector implements MetricCollector{
 
         double memoryUtilization = calculateMemoryUtilization(memFree, memCached, memBuffers, memTotal);
 
-//        log.info("Memory Free: {}, Memory Cached: {}, Memory Buffers: {}, Memory Total: {}", memFree, memCached, memBuffers, memTotal);
+        log.info("Memory Free: {}, Memory Cached: {}, Memory Buffers: {}, Memory Total: {}", memFree, memCached, memBuffers, memTotal);
 
         return memoryUtilization;
     }
@@ -106,42 +102,5 @@ public class MemoryMetricCollector implements MetricCollector{
 
     private static double calculateMemoryUtilization(double memFree, double memCached, double memBuffers, double memTotal) {
         return 100 * (1 - ((memFree + memCached + memBuffers) / memTotal));
-    }
-
-    private void saveMetric(MetricValues metricValues) {
-        //TODO: Save Metric
-        HypervisorInstanceMetric instanceMetric = HypervisorInstanceMetric.builder()
-                .name(metricType)
-                .date(LocalDate.now(seoulZoneId))
-                .metricValues(metricValues)
-                .build();
-
-        HypervisorInstanceMetric savedInstanceMetric = hypervisorInstanceMetricRepository.save(instanceMetric);
-
-        //TODO: Save Instance
-        String cloudInstanceId = "Instance 1";
-        CloudInstance cloudInstance = cloudInstanceRepository.findById(cloudInstanceId)
-                .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).createdDate(LocalDate.now(seoulZoneId)).build());
-
-        cloudInstance.addToHypervisorMemoryUtilizationMetricIds(savedInstanceMetric.getId());
-        cloudInstance = cloudInstanceRepository.save(cloudInstance);
-
-        //TODO: Save Project
-        String cloudProjectId = "CloudProject 1";
-        CloudProject cloudProject = cloudProjectRepository.findById(cloudProjectId)
-                .orElseGet(() -> CloudProject.builder().id(cloudProjectId).createdDate(LocalDate.now(seoulZoneId)).build());
-
-        cloudProject.addToCloudInstanceIds(cloudInstance.getId());
-        cloudProjectRepository.save(cloudProject);
-
-        //TODO: Save Hypervisor
-        String hypervisorId = "Hypervisor 1";
-        Hypervisor hypervisor = hypervisorRepository.findById(hypervisorId)
-                .orElseGet(() -> Hypervisor.builder().id(hypervisorId).createdDate(LocalDate.now(seoulZoneId)).build());
-
-        hypervisor.addToCloudInstanceIds(cloudInstance.getId());
-        hypervisorRepository.save(hypervisor);
-
-        log.info("Save Memory Metric");
     }
 }
