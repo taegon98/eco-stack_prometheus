@@ -14,6 +14,8 @@ public class CloudInstance {
 
     @Id
     private String id;
+    private List<String> hypervisorCpuUtilizationMetricIds;
+    private List<String> hypervisorMemoryUtilizationMetricIds;
     private List<String> cpuUtilizationMetricIds;
     private List<String> memoryUtilizationMetricIds;
     private List<String> diskUtilizationMetricIds;

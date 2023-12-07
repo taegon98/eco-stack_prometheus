@@ -11,8 +11,8 @@ import java.time.LocalDate;
 @ToString
 @Builder
 @Getter
-@Document(collection = "Metric")
-public class Metric {
+@Document(collection = "InstanceMetric")
+public class InstanceMetric {
 
     @Id
     private String id;
