@@ -1,9 +1,9 @@
 package openstack.eco_stack.repository;
 
-import openstack.eco_stack.model.InstanceMetric;
+import openstack.eco_stack.model.CloudInstanceMetric;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface InstanceMetricRepository extends MongoRepository<InstanceMetric, String> {
+public interface CloudInstanceMetricRepository extends MongoRepository<CloudInstanceMetric, String> {
 }
