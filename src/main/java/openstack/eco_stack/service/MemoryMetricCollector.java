@@ -30,7 +30,8 @@ public class MemoryMetricCollector implements MetricCollector{
     private final HypervisorRepository hypervisorRepository;
     private final String metricType = "Memory Utilization";
 
-    @Scheduled(cron = "0 0 0 * * *")
+    //@Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(fixedRate = 5000)
     public void collectMetric() {
         RestTemplate restTemplate = new RestTemplate();
         long endTime = now.toEpochSecond();
@@ -120,7 +121,7 @@ public class MemoryMetricCollector implements MetricCollector{
         //TODO: Save Instance
         String cloudInstanceId = "Instance 1";
         CloudInstance cloudInstance = cloudInstanceRepository.findById(cloudInstanceId)
-                .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).build());
+                .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).createdDate(LocalDate.now(seoulZoneId)).build());
 
         cloudInstance.addToHypervisorMemoryUtilizationMetricIds(savedInstanceMetric.getId());
         cloudInstance = cloudInstanceRepository.save(cloudInstance);
@@ -128,7 +129,7 @@ public class MemoryMetricCollector implements MetricCollector{
         //TODO: Save Project
         String cloudProjectId = "CloudProject 1";
         CloudProject cloudProject = cloudProjectRepository.findById(cloudProjectId)
-                .orElseGet(() -> CloudProject.builder().id(cloudProjectId).build());
+                .orElseGet(() -> CloudProject.builder().id(cloudProjectId).createdDate(LocalDate.now(seoulZoneId)).build());
 
         cloudProject.addToCloudInstanceIds(cloudInstance.getId());
         cloudProjectRepository.save(cloudProject);
@@ -136,7 +137,7 @@ public class MemoryMetricCollector implements MetricCollector{
         //TODO: Save Hypervisor
         String hypervisorId = "Hypervisor 1";
         Hypervisor hypervisor = hypervisorRepository.findById(hypervisorId)
-                .orElseGet(() -> Hypervisor.builder().id(hypervisorId).build());
+                .orElseGet(() -> Hypervisor.builder().id(hypervisorId).createdDate(LocalDate.now(seoulZoneId)).build());
 
         hypervisor.addToCloudInstanceIds(cloudInstance.getId());
         hypervisorRepository.save(hypervisor);

@@ -24,6 +24,8 @@ public class CloudProject {
     private LocalDate createdDate;
     private String Owner;
     @Builder.Default
+    private int lastCloudInstanceCnt = 0;
+    @Builder.Default
     private Set<String> cloudInstanceIds = new HashSet<>();
 
     public void addToCloudInstanceIds(String cloudInstanceId) {

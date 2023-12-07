@@ -5,6 +5,7 @@ import lombok.Getter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -18,6 +19,9 @@ public class Hypervisor {
     @Id
     private String id;
     private String name;
+    private LocalDate createdDate;
+    @Builder.Default
+    private int lastCloudInstanceCnt = 0;
     @Builder.Default
     private Set<String> cloudInstanceIds = new HashSet<>();
 

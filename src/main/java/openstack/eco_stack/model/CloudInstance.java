@@ -5,6 +5,7 @@ import lombok.Getter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +16,7 @@ public class CloudInstance {
 
     @Id
     private String id;
+    private LocalDate createdDate;
 
     @Builder.Default
     private List<String> hypervisorCpuUtilizationMetricIds = new ArrayList<>();
