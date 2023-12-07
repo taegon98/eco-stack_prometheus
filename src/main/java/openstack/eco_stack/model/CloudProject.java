@@ -7,6 +7,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -21,7 +22,8 @@ public class CloudProject {
     @Id
     private String id;
     private String name;
-    private LocalDate createdDate;
+    @Builder.Default
+    private LocalDate createdDate = LocalDate.now(ZoneId.of("Asia/Seoul"));
     private String Owner;
     @Builder.Default
     private int lastCloudInstanceCnt = 0;
