@@ -7,8 +7,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Builder
 @Getter
@@ -21,12 +20,15 @@ public class CloudInstance {
     private LocalDate createdDate = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
     @Builder.Default
-    private List<String> hypervisorCpuUtilizationMetricIds = new ArrayList<>();
+    private Set<String> hypervisorCpuUtilizationMetricIds = new LinkedHashSet<>();
     @Builder.Default
-    private List<String> hypervisorMemoryUtilizationMetricIds = new ArrayList<>();
-    private List<String> cpuUtilizationMetricIds;
-    private List<String> memoryUtilizationMetricIds;
-    private List<String> diskUtilizationMetricIds;
+    private Set<String> hypervisorMemoryUtilizationMetricIds = new LinkedHashSet<>();
+    @Builder.Default
+    private Set<String> cpuUtilizationMetricIds = new LinkedHashSet<>();
+    @Builder.Default
+    private Set<String> memoryUtilizationMetricIds = new LinkedHashSet<>();
+    @Builder.Default
+    private Set<String> diskUtilizationMetricIds = new LinkedHashSet<>();
 
     public void addToHypervisorCpuUtilizationMetricIds(String metricId) {
         this.hypervisorCpuUtilizationMetricIds.add(metricId);
@@ -34,5 +36,13 @@ public class CloudInstance {
 
     public void addToHypervisorMemoryUtilizationMetricIds(String metricId) {
         this.hypervisorMemoryUtilizationMetricIds.add(metricId);
+    }
+
+    public void addToCpuUtilizationMetricIds(String metricId) {
+        this.cpuUtilizationMetricIds.add(metricId);
+    }
+
+    public void addToMemoryUtilizationMetricIds(String metricId) {
+        this.memoryUtilizationMetricIds.add(metricId);
     }
 }

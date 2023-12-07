@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import openstack.eco_stack.model.*;
-import openstack.eco_stack.repository.CloudInstanceRepository;
-import openstack.eco_stack.repository.CloudProjectRepository;
-import openstack.eco_stack.repository.HypervisorInstanceMetricRepository;
-import openstack.eco_stack.repository.HypervisorRepository;
+import openstack.eco_stack.repository.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -30,6 +27,7 @@ public class CpuMetricCollector implements MetricCollector{
     private final CloudInstanceRepository cloudInstanceRepository;
     private final CloudProjectRepository cloudProjectRepository;
     private final HypervisorRepository hypervisorRepository;
+    private final CloudInstanceMetricRepository cloudInstanceMetricRepository;
 
     private final String metricType = "CPU Utilization";
     private final int NUMBER_OF_CPU = 4;
@@ -114,12 +112,20 @@ public class CpuMetricCollector implements MetricCollector{
 
         HypervisorInstanceMetric savedInstanceMetric = hypervisorInstanceMetricRepository.save(instanceMetric);
 
+        CloudInstanceMetric cloudInstanceMetric = CloudInstanceMetric.builder()
+                .name(metricType)
+                .date(LocalDate.now(seoulZoneId))
+                .metricValues(metricValues)
+                .build();
+        cloudInstanceMetricRepository.save(cloudInstanceMetric);
+
         //TODO: Save Instance
         String cloudInstanceId = "Instance 1";
         CloudInstance cloudInstance = cloudInstanceRepository.findById(cloudInstanceId)
                 .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).createdDate(LocalDate.now(seoulZoneId)).build());
 
         cloudInstance.addToHypervisorCpuUtilizationMetricIds(savedInstanceMetric.getId());
+        cloudInstance.addToCpuUtilizationMetricIds(cloudInstanceMetric.getId());
         cloudInstance = cloudInstanceRepository.save(cloudInstance);
 
         //TODO: Save Project
