@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import openstack.eco_stack.model.HypervisorInstanceMetric;
-import openstack.eco_stack.model.InstanceMetric;
-import openstack.eco_stack.model.MetricValue;
-import openstack.eco_stack.model.MetricValues;
+import openstack.eco_stack.model.*;
+import openstack.eco_stack.repository.CloudInstanceRepository;
+import openstack.eco_stack.repository.CloudProjectRepository;
 import openstack.eco_stack.repository.HypervisorInstanceMetricRepository;
+import openstack.eco_stack.repository.HypervisorRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -27,6 +27,10 @@ import java.time.ZonedDateTime;
 public class CpuMetricCollector implements MetricCollector{
 
     private final HypervisorInstanceMetricRepository hypervisorInstanceMetricRepository;
+    private final CloudInstanceRepository cloudInstanceRepository;
+    private final CloudProjectRepository cloudProjectRepository;
+    private final HypervisorRepository hypervisorRepository;
+
     private final String metricType = "CPU Utilization";
     private final int NUMBER_OF_CPU = 4;
 
@@ -100,12 +104,39 @@ public class CpuMetricCollector implements MetricCollector{
     }
 
     private void saveMetric(MetricValues metricValues) {
+        //TODO: Save Metric
         HypervisorInstanceMetric instanceMetric = HypervisorInstanceMetric.builder()
                 .name(metricType)
                 .date(LocalDate.now(seoulZoneId))
                 .metricValues(metricValues)
                 .build();
 
-        hypervisorInstanceMetricRepository.save(instanceMetric);
+        HypervisorInstanceMetric savedInstanceMetric = hypervisorInstanceMetricRepository.save(instanceMetric);
+
+        //TODO: Save Instance
+        String cloudInstanceId = "Instance 1";
+        CloudInstance cloudInstance = cloudInstanceRepository.findById(cloudInstanceId)
+                .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).build());
+
+        cloudInstance.addToHypervisorCpuUtilizationMetricIds(savedInstanceMetric.getId());
+        cloudInstance = cloudInstanceRepository.save(cloudInstance);
+
+        //TODO: Save Project
+        String cloudProjectId = "CloudProject 1";
+        CloudProject cloudProject = cloudProjectRepository.findById(cloudProjectId)
+                        .orElseGet(() -> CloudProject.builder().id(cloudProjectId).build());
+
+        cloudProject.addToCloudInstanceIds(cloudInstance.getId());
+        cloudProjectRepository.save(cloudProject);
+
+        //TODO: Save Hypervisor
+        String hypervisorId = "Hypervisor 1";
+        Hypervisor hypervisor = hypervisorRepository.findById(hypervisorId)
+                        .orElseGet(() -> Hypervisor.builder().id(hypervisorId).build());
+
+        hypervisor.addToCloudInstanceIds(cloudInstance.getId());
+        hypervisorRepository.save(hypervisor);
+
+        log.info("Save CPU Metric");
     }
 }
