@@ -32,8 +32,9 @@ public class CpuMetricCollector implements MetricCollector{
     private final String metricType = "CPU Utilization";
     private final int NUMBER_OF_CPU = 4;
 
-    //@Scheduled(cron = "0 0 0 * * *")
-    @Scheduled(fixedRate = 5000)
+
+//    @Scheduled(fixedRate = 5000)
+    @Scheduled(cron = "0 0 0 * * *")
     public void collectMetric() throws UnsupportedEncodingException {
         RestTemplate restTemplate = new RestTemplate();
         long endTime = now.toEpochSecond();
