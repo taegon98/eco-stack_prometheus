@@ -1,4 +1,4 @@
-package openstack.eco_stack.service;
+package openstack.eco_stack.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -6,22 +6,26 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import openstack.eco_stack.model.*;
 import openstack.eco_stack.repository.*;
+import openstack.eco_stack.service.MetricCollector;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Component
 @Slf4j
-public class CpuMetricCollector implements MetricCollector{
+public class HypervisorMetricCollector implements MetricCollector {
 
     private final HypervisorInstanceMetricRepository hypervisorInstanceMetricRepository;
     private final CloudInstanceRepository cloudInstanceRepository;
@@ -29,42 +33,47 @@ public class CpuMetricCollector implements MetricCollector{
     private final HypervisorRepository hypervisorRepository;
     private final CloudInstanceMetricRepository cloudInstanceMetricRepository;
 
-    private final String metricType = "CPU Utilization";
-    private final int NUMBER_OF_CPU = 4;
-
-
-//    @Scheduled(fixedRate = 5000)
-    @Scheduled(cron = "0 0 0 * * *")
-    public void collectMetric() throws UnsupportedEncodingException {
-        RestTemplate restTemplate = new RestTemplate();
-        long endTime = now.toEpochSecond();
-        long startTime = oneDayAgo.toEpochSecond();
-        MetricValues metricValues = MetricValues.builder().build();
-
-        while (startTime < endTime) {
-            double cpuUtilizationAvg = 0;
-            ZonedDateTime hour = null;
-            for (int cpuNumber = 0; cpuNumber < NUMBER_OF_CPU; cpuNumber++) {
-                double cpuUtilization = fetchAndCalculateCPUUtilization(restTemplate, prometheusUrl, startTime, cpuNumber);
-                hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), seoulZoneId);
-                cpuUtilizationAvg += cpuUtilization;
-//                log.info("[{}] CPU {} Utilization: {}%", hour, cpuNumber, cpuUtilization); //[hour: 수집 시각, cpuNUmber: cpuNUmber 번호, cpuUtilization: CPU 사용률]
-            }
-            cpuUtilizationAvg /= NUMBER_OF_CPU;
-
-            MetricValue metricValue = MetricValue.builder()
-                    .dateTime(hour.toInstant())
-                    .value(cpuUtilizationAvg)
-                    .build();
-            metricValues.add(metricValue);
-
-            startTime += 3600;
-        }
-
-        saveMetric(metricValues);
+    private static final String metricType = "CPU Utilization";
+    private static final int NUMBER_OF_CPU = 8;
+    public static void main(String[] args) throws UnsupportedEncodingException {
+        collectMetric();
     }
 
-    private double fetchAndCalculateCPUUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu) throws UnsupportedEncodingException {
+    //    @Scheduled(fixedRate = 5000)
+    @Scheduled(cron = "0 0 0 * * *")
+    public static void collectMetric() throws UnsupportedEncodingException {
+        RestTemplate restTemplate = new RestTemplate();
+        MetricValues metricValues = MetricValues.builder().build();
+
+        List<String> hypervisorIPs = Arrays.asList("192.168.0.36", "192.168.0.28", "192.168.0.87", "192.168.0.96");
+
+        ZonedDateTime endTime = ZonedDateTime.now();
+        ZonedDateTime startTime = endTime.minusDays(1);
+
+        for (ZonedDateTime currentTime = startTime; currentTime.isBefore(endTime); currentTime = currentTime.plusHours(1)) {
+          //  for (String ip : hypervisorIPs) {
+                double totalUtilization = 0.0;
+                for (int cpuNumber = 0; cpuNumber < NUMBER_OF_CPU; cpuNumber++) {
+                    double cpuUtilization = fetchAndCalculateCPUUtilization(restTemplate, prometheusUrl, currentTime.toEpochSecond(), cpuNumber);
+
+                    ZonedDateTime hour = ZonedDateTime.ofInstant(Instant.ofEpochSecond(currentTime.toEpochSecond()), ZoneId.systemDefault());
+                    //log.info("[{}] Hypervisor: {}, CPU {} Utilization: {}%", hour, ip, cpuNumber, cpuUtilization);
+
+                    MetricValue metricValue = MetricValue.builder()
+                            .dateTime(hour.toInstant())
+                            .value(cpuUtilization)
+                            .build();
+                    metricValues.add(metricValue);
+
+                    totalUtilization += cpuUtilization;
+                }
+                log.info(String.format("Total CPU Utilization: %.3f%%", totalUtilization));
+            }
+      //  }
+    }
+
+
+    private static double fetchAndCalculateCPUUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu) throws UnsupportedEncodingException {
         String query = "avg without (mode,cpu) (1 - rate(node_cpu_seconds_total{cpu=\"" + cpu + "\", mode=\"idle\"}[1h]))";
         String encodedQuery = java.net.URLEncoder.encode(query, "UTF-8");
         URI uri;
@@ -79,7 +88,7 @@ public class CpuMetricCollector implements MetricCollector{
         return extractCPUUtilization(response, cpu);
     }
 
-    private double extractCPUUtilization(ResponseEntity<String> response, int cpu) {
+    private static double extractCPUUtilization(ResponseEntity<String> response, int cpu) {
         if (response.getStatusCode().is2xxSuccessful()) {
             String responseBody = response.getBody();
             ObjectMapper objectMapper = new ObjectMapper();
@@ -103,7 +112,7 @@ public class CpuMetricCollector implements MetricCollector{
         return 0.0;
     }
 
-    private void saveMetric(MetricValues metricValues) {
+    private static void saveMetric(MetricValues metricValues) {
         //TODO: Save Metric
         HypervisorInstanceMetric instanceMetric = HypervisorInstanceMetric.builder()
                 .name(metricType)
@@ -111,7 +120,7 @@ public class CpuMetricCollector implements MetricCollector{
                 .metricValues(metricValues)
                 .build();
 
-        HypervisorInstanceMetric savedInstanceMetric = hypervisorInstanceMetricRepository.save(instanceMetric);
+//        HypervisorInstanceMetric savedInstanceMetric = hypervisorInstanceMetricRepository.save(instanceMetric);
 
 //        CloudInstanceMetric cloudInstanceMetric = CloudInstanceMetric.builder()
 //                .name(metricType)
