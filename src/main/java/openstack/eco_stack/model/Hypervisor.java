@@ -7,10 +7,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Builder
 @Getter
@@ -26,6 +23,10 @@ public class Hypervisor {
     private int lastCloudInstanceCnt = 0;
     @Builder.Default
     private Set<String> cloudInstanceIds = new HashSet<>();
+    @Builder.Default
+    private Set<String> cpuUtilizationMetricIds = new LinkedHashSet<>();
+    @Builder.Default
+    private Set<String> memoryUtilizationMetricIds = new LinkedHashSet<>();
 
     public void addToCloudInstanceIds(String cloudInstanceId) {
         this.cloudInstanceIds.add(cloudInstanceId);
