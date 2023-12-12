@@ -6,54 +6,67 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import openstack.eco_stack.model.*;
 import openstack.eco_stack.repository.*;
+import openstack.eco_stack.service.MetricCollector;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Optional;
+import java.util.Arrays;
+import java.util.List;
+
 
 @RequiredArgsConstructor
 @Component
 @Slf4j
-public class MemoryMetricCollector implements MetricCollector{
+public class HypervisorMemoryCollector implements MetricCollector {
 
     private final CloudInstanceRepository cloudInstanceRepository;
     private final HypervisorInstanceMetricRepository hypervisorInstanceMetricRepository;
     private final CloudProjectRepository cloudProjectRepository;
     private final HypervisorRepository hypervisorRepository;
     private final CloudInstanceMetricRepository cloudInstanceMetricRepository;
+
     private final String metricType = "Memory Utilization";
 
+    private static final int NUMBER_OF_HYPERVISORS = 4;
+    private static final List<String> hypervisorIPs = Arrays.asList("192.168.0.36", "192.168.0.28", "192.168.0.87", "192.168.0.96");
 
-//    @Scheduled(fixedRate = 5000)
-    @Scheduled(cron = "0 0 0 * * *")
-    public void collectMetric() {
-        RestTemplate restTemplate = new RestTemplate();
-        long endTime = now.toEpochSecond();
-        long startTime = oneDayAgo.toEpochSecond();
-        MetricValues metricValues = MetricValues.builder().build();
-
-        while (startTime < endTime) {
-            double memoryUtilization = calculateHourlyMemoryUtilization(restTemplate, prometheusUrl, startTime);
-            ZonedDateTime hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), seoulZoneId);
-            log.info("[{}] Memory Utilization: {}%", hour, memoryUtilization); //[hour: 수집 시각, memoryUtilization: memory 사용률]
-            MetricValue metricValue = MetricValue.builder()
-                    .dateTime(hour.toInstant())
-                    .value(memoryUtilization)
-                    .build();
-            metricValues.add(metricValue);
-
-            startTime += 3600;
-        }
-
-        saveMetric(metricValues);
+    public static void main(String[] args) {
+        collectMetric();
     }
 
-    private double calculateHourlyMemoryUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime) {
+    //@Scheduled(fixedRate = 5000)
+    //@Scheduled(cron = "0 0 0 * * *")
+    public static void collectMetric() {
+        for (String ip : hypervisorIPs) {
+            RestTemplate restTemplate = new RestTemplate();
+            long endTime = ZonedDateTime.now().toEpochSecond();
+            long startTime = ZonedDateTime.now().minusDays(1).toEpochSecond();
+            MetricValues metricValues = MetricValues.builder().build();
+
+            while (startTime < endTime) {
+                double memoryUtilization = calculateHourlyMemoryUtilization(restTemplate, prometheusUrl, startTime);
+                ZonedDateTime hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), ZoneId.systemDefault());
+                log.info("[{}] Memory Utilization: {}%", hour, memoryUtilization);
+
+                MetricValue metricValue = MetricValue.builder()
+                        .dateTime(hour.toInstant())
+                        .value(memoryUtilization)
+                        .build();
+                metricValues.add(metricValue);
+
+                startTime += 3600;
+            }
+
+            // saveMetric(ip, metricValues);
+        }
+    }
+
+
+    private static double calculateHourlyMemoryUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime) {
         String memFreeQuery = prometheusUrl + "/api/v1/query?" +
                 "query=avg_over_time(node_memory_MemFree_bytes[60m])" +
                 "&time=" + startTime;
@@ -79,7 +92,7 @@ public class MemoryMetricCollector implements MetricCollector{
         return memoryUtilization;
     }
 
-    private double extractValue(ResponseEntity<String> response) {
+    private static double extractValue(ResponseEntity<String> response) {
         if (response.getStatusCode().is2xxSuccessful()) {
             String result = response.getBody();
             ObjectMapper objectMapper = new ObjectMapper();

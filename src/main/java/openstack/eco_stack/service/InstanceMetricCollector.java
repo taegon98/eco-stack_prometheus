@@ -1,4 +1,4 @@
-package openstack.eco_stack.controller;
+package openstack.eco_stack.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,12 +14,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Slf4j
-public class LibvirtExporterTest {
-
-
+public class InstanceMetricCollector {
     public static void main(String[] args) {
 
-        String prometheusUrl = "http://133.186.215.103:9090";
+        String prometheusUrl = "http://180.210.80.14:9090";
         String promQLQueryCpuWithTime = "avg_over_time(libvirt_domain_info_cpu_time_seconds_total[1h])";
         String promQLQueryMemoryWithTime = "avg_over_time(libvirt_domain_info_memory_usage_bytes[1h])";
         String promQLQueryVirtualCpuWithTime = "avg_over_time(libvirt_domain_info_virtual_cpus[1h])";
@@ -75,21 +73,19 @@ public class LibvirtExporterTest {
                         log.info("Matcher not found for: " + metricData);
                     }
 
-
                     JsonNode valuesNodeCpu = rootNodeCpu.get(i).get("values");
                     JsonNode valuesNodeMemory = rootNodeMemory.get(i).get("values");
                     JsonNode valuesNodeVirtualCpu = rootNodeVirtualCpu.get(i).get("values");
 
+
                     long timestamp = valuesNodeCpu.get(0).get(0).asLong();
                     ZonedDateTime dataCollectionTime = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(timestamp), ZoneId.of("UTC"));
                     String formattedTime = dataCollectionTime.withZoneSameInstant(seoulZoneId).toString();
+                    double cpuUtilization = calculateCPUUtilization(valuesNodeCpu);
 
                     StringBuilder message = new StringBuilder();
                     message.append(formattedTime).append("\n");
-
-                    message.append("CPU TIME: ");
-                    appendValues(valuesNodeCpu, message);
-                    message.append("\n");
+                    message.append("CPU UTILIZATION: ").append(cpuUtilization).append("%\n");
 
                     message.append("VIRTUAL CPU: ");
                     appendValues(valuesNodeVirtualCpu, message);
@@ -117,6 +113,28 @@ public class LibvirtExporterTest {
             message.append(value).append(", ");
         }
     }
+
+
+    private static double calculateCPUUtilization(JsonNode valuesNodeCpu) {
+        double totalCPUTime = 0.0;
+        double prevCPUTime = 0.0;
+        int validValues = 0;
+
+        for (int i = 0; i < valuesNodeCpu.size(); i++) {
+            JsonNode valueNode = valuesNodeCpu.get(i);
+            if (valueNode != null && valueNode.isArray() && valueNode.size() > 1) {
+                double currentCPUTime = valueNode.get(1).asDouble();
+                if (i > 0) {
+                    totalCPUTime += (currentCPUTime - prevCPUTime);
+                    validValues++;
+                }
+                prevCPUTime = currentCPUTime;
+            }
+        }
+
+        return (validValues > 0) ? ((totalCPUTime / validValues) / prevCPUTime) * 100 : 0.0;
+    }
+
 
     private static String fetchMetricsData() {
         String prometheusMetricsURL = "http://133.186.215.103:9000/metrics";

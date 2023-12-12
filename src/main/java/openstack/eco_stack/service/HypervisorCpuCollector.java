@@ -18,8 +18,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Arrays;
-import java.util.List;
 
 @RequiredArgsConstructor
 @Component
@@ -34,46 +32,41 @@ public class HypervisorCpuCollector implements MetricCollector {
 
     private static final String metricType = "CPU Utilization";
     private static final int NUMBER_OF_CPU = 8;
-    public static void main(String[] args) throws UnsupportedEncodingException {
-        collectMetric();
-    }
 
-    //    @Scheduled(fixedRate = 5000)
+    @Scheduled(fixedRate = 5000)
     @Scheduled(cron = "0 0 0 * * *")
-    public static void collectMetric() throws UnsupportedEncodingException {
+    public void collectMetric() throws UnsupportedEncodingException {
         RestTemplate restTemplate = new RestTemplate();
         MetricValues metricValues = MetricValues.builder().build();
 
-        List<String> hypervisorIPs = Arrays.asList("192.168.0.36", "192.168.0.28", "192.168.0.87", "192.168.0.96");
+        String[] instances = {"192.168.0.36:9100", "192.168.0.28:9100", "192.168.0.87:9100", "192.168.0.96:9100"};
 
         ZonedDateTime endTime = ZonedDateTime.now();
         ZonedDateTime startTime = endTime.minusDays(1);
 
-        for (ZonedDateTime currentTime = startTime; currentTime.isBefore(endTime); currentTime = currentTime.plusHours(1)) {
-            //  for (String ip : hypervisorIPs) {
-            double totalUtilization = 0.0;
-            for (int cpuNumber = 0; cpuNumber < NUMBER_OF_CPU; cpuNumber++) {
-                double cpuUtilization = fetchAndCalculateCPUUtilization(restTemplate, prometheusUrl, currentTime.toEpochSecond(), cpuNumber);
+        for (String instance : instances) {
+            for (ZonedDateTime currentTime = startTime; currentTime.isBefore(endTime); currentTime = currentTime.plusHours(1)) {
+                double totalUtilization = 0.0;
+                for (int cpuNumber = 0; cpuNumber < NUMBER_OF_CPU; cpuNumber++) {
+                    double cpuUtilization = fetch(restTemplate, prometheusUrl, currentTime.toEpochSecond(), cpuNumber, instance);
 
-                ZonedDateTime hour = ZonedDateTime.ofInstant(Instant.ofEpochSecond(currentTime.toEpochSecond()), ZoneId.systemDefault());
-                //log.info("[{}] Hypervisor: {}, CPU {} Utilization: {}%", hour, ip, cpuNumber, cpuUtilization);
+                    ZonedDateTime hour = ZonedDateTime.ofInstant(Instant.ofEpochSecond(currentTime.toEpochSecond()), ZoneId.systemDefault());
+                    MetricValue metricValue = MetricValue.builder()
+                            .dateTime(hour.toInstant())
+                            .value(cpuUtilization)
+                            .build();
+                    metricValues.add(metricValue);
 
-                MetricValue metricValue = MetricValue.builder()
-                        .dateTime(hour.toInstant())
-                        .value(cpuUtilization)
-                        .build();
-                metricValues.add(metricValue);
-
-                totalUtilization += cpuUtilization;
+                    totalUtilization += cpuUtilization;
+                }
+                log.info("Time: " + currentTime + " - Total CPU Utilization for instance " + instance + ": " + String.format("%.4f%%", totalUtilization));
             }
-            log.info(String.format("Total CPU Utilization: %.3f%%", totalUtilization));
         }
-        //  }
+        saveMetric(metricValues);
     }
 
-
-    private static double fetchAndCalculateCPUUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu) throws UnsupportedEncodingException {
-        String query = "avg without (mode,cpu) (1 - rate(node_cpu_seconds_total{cpu=\"" + cpu + "\", mode=\"idle\"}[1h]))";
+    private double fetch(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu, String instance) throws UnsupportedEncodingException {
+        String query = "avg without (mode,cpu) (1 - rate(node_cpu_seconds_total{cpu=\"" + cpu + "\", instance=\"" + instance + "\", mode=\"idle\"}[1h]))";
         String encodedQuery = java.net.URLEncoder.encode(query, "UTF-8");
         URI uri;
 
@@ -84,10 +77,10 @@ public class HypervisorCpuCollector implements MetricCollector {
             return 0.0;
         }
         ResponseEntity<String> response = restTemplate.getForEntity(uri, String.class);
-        return extractCPUUtilization(response, cpu);
+        return extract(response, cpu);
     }
 
-    private static double extractCPUUtilization(ResponseEntity<String> response, int cpu) {
+    private double extract(ResponseEntity<String> response, int cpu) {
         if (response.getStatusCode().is2xxSuccessful()) {
             String responseBody = response.getBody();
             ObjectMapper objectMapper = new ObjectMapper();
@@ -111,7 +104,7 @@ public class HypervisorCpuCollector implements MetricCollector {
         return 0.0;
     }
 
-    private static void saveMetric(MetricValues metricValues) {
+    private void saveMetric(MetricValues metricValues) {
         //TODO: Save Metric
         HypervisorInstanceMetric instanceMetric = HypervisorInstanceMetric.builder()
                 .name(metricType)
@@ -119,39 +112,39 @@ public class HypervisorCpuCollector implements MetricCollector {
                 .metricValues(metricValues)
                 .build();
 
-//        HypervisorInstanceMetric savedInstanceMetric = hypervisorInstanceMetricRepository.save(instanceMetric);
+        HypervisorInstanceMetric savedInstanceMetric = hypervisorInstanceMetricRepository.save(instanceMetric);
 
-//        CloudInstanceMetric cloudInstanceMetric = CloudInstanceMetric.builder()
-//                .name(metricType)
-//                .date(LocalDate.now(seoulZoneId))
-//                .metricValues(metricValues)
-//                .build();
-//        cloudInstanceMetricRepository.save(cloudInstanceMetric);
-//
-//        //TODO: Save Instance
-//        String cloudInstanceId = "Instance 1";
-//        CloudInstance cloudInstance = cloudInstanceRepository.findById(cloudInstanceId)
-//                .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).createdDate(LocalDate.now(seoulZoneId)).build());
-//
-//        cloudInstance.addToHypervisorCpuUtilizationMetricIds(savedInstanceMetric.getId());
-//        cloudInstance.addToCpuUtilizationMetricIds(cloudInstanceMetric.getId());
-//        cloudInstance = cloudInstanceRepository.save(cloudInstance);
-//
-//        //TODO: Save Project
-//        String cloudProjectId = "CloudProject 1";
-//        CloudProject cloudProject = cloudProjectRepository.findById(cloudProjectId)
-//                        .orElseGet(() -> CloudProject.builder().id(cloudProjectId).createdDate(LocalDate.now(seoulZoneId)).build());
-//
-//        cloudProject.addToCloudInstanceIds(cloudInstance.getId());
-//        cloudProjectRepository.save(cloudProject);
-//
-//        //TODO: Save Hypervisor
-//        String hypervisorId = "Hypervisor 1";
-//        Hypervisor hypervisor = hypervisorRepository.findById(hypervisorId)
-//                        .orElseGet(() -> Hypervisor.builder().id(hypervisorId).createdDate(LocalDate.now(seoulZoneId)).build());
-//
-//        hypervisor.addToCloudInstanceIds(cloudInstance.getId());
-//        hypervisorRepository.save(hypervisor);
+        CloudInstanceMetric cloudInstanceMetric = CloudInstanceMetric.builder()
+                .name(metricType)
+                .date(LocalDate.now(seoulZoneId))
+                .metricValues(metricValues)
+                .build();
+        cloudInstanceMetricRepository.save(cloudInstanceMetric);
+
+        //TODO: Save Instance
+        String cloudInstanceId = "Instance 1";
+        CloudInstance cloudInstance = cloudInstanceRepository.findById(cloudInstanceId)
+                .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).createdDate(LocalDate.now(seoulZoneId)).build());
+
+        cloudInstance.addToHypervisorCpuUtilizationMetricIds(savedInstanceMetric.getId());
+        cloudInstance.addToCpuUtilizationMetricIds(cloudInstanceMetric.getId());
+        cloudInstance = cloudInstanceRepository.save(cloudInstance);
+
+        //TODO: Save Project
+        String cloudProjectId = "CloudProject 1";
+        CloudProject cloudProject = cloudProjectRepository.findById(cloudProjectId)
+                        .orElseGet(() -> CloudProject.builder().id(cloudProjectId).createdDate(LocalDate.now(seoulZoneId)).build());
+
+        cloudProject.addToCloudInstanceIds(cloudInstance.getId());
+        cloudProjectRepository.save(cloudProject);
+
+        //TODO: Save Hypervisor
+        String hypervisorId = "Hypervisor 1";
+        Hypervisor hypervisor = hypervisorRepository.findById(hypervisorId)
+                        .orElseGet(() -> Hypervisor.builder().id(hypervisorId).createdDate(LocalDate.now(seoulZoneId)).build());
+
+        hypervisor.addToCloudInstanceIds(cloudInstance.getId());
+        hypervisorRepository.save(hypervisor);
 
         log.info("Save CPU Metric");
     }
