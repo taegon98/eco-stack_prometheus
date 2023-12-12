@@ -19,15 +19,10 @@ public class InstanceMetricCollector implements MetricCollector{
     static String promQLQueryMemoryWithTime = "avg_over_time(libvirt_domain_info_memory_usage_bytes[1h])";
     static String promQLQueryVirtualCpuWithTime = "avg_over_time(libvirt_domain_info_virtual_cpus[1h])";
 
-    private static final int Instance = 20;
     static long endTime = now.toEpochSecond();
     static long startTime = oneDayAgo.toEpochSecond();
 
-    public static void main(String[] args) {
-        collectMetric();
-    }
-
-    public static void collectMetric() {
+    public void collectMetric() {
         RestTemplate restTemplate = new RestTemplate();
 
         ZonedDateTime currentCollectionTime = ZonedDateTime.now().minusDays(1);
@@ -42,7 +37,7 @@ public class InstanceMetricCollector implements MetricCollector{
         }
     }
 
-    private static void fetch(RestTemplate restTemplate, String prometheusUrl, long startTime, long endTime, int hour) {
+    private void fetch(RestTemplate restTemplate, String prometheusUrl, long startTime, long endTime, int hour) {
         String prometheusQueryURLCpu = prometheusUrl + "/api/v1/query_range?query=" + promQLQueryCpuWithTime +
                 "&start=" + startTime + "&end=" + endTime + "&step=3600";
         String prometheusQueryURLMemory = prometheusUrl + "/api/v1/query_range?query=" + promQLQueryMemoryWithTime +
@@ -104,7 +99,7 @@ public class InstanceMetricCollector implements MetricCollector{
     }
 
 
-    private static double calculateMemoryUsage(JsonNode valuesNodeMemory) {
+    private double calculateMemoryUsage(JsonNode valuesNodeMemory) {
         double totalMemoryUsageBytes = 0.0;
 
         for (int i = 0; i < valuesNodeMemory.size(); i++) {
@@ -118,7 +113,7 @@ public class InstanceMetricCollector implements MetricCollector{
         return totalMemoryUsageBytes / (1024 * 1024);
     }
 
-    private static double calculateVirtualCpu(JsonNode valuesNodeVirtualCpu) {
+    private double calculateVirtualCpu(JsonNode valuesNodeVirtualCpu) {
         double totalVirtualCpu = 0.0;
 
         for (int i = 0; i < valuesNodeVirtualCpu.size(); i++) {
@@ -131,7 +126,7 @@ public class InstanceMetricCollector implements MetricCollector{
         return totalVirtualCpu;
     }
 
-    private static double calculateCPUUtilization(JsonNode valuesNodeCpu) {
+    private double calculateCPUUtilization(JsonNode valuesNodeCpu) {
         double totalCPUTime = 0.0;
         double prevCPUTime = 0.0;
         int validValues = 0;
@@ -151,7 +146,7 @@ public class InstanceMetricCollector implements MetricCollector{
     }
 
 
-    private static List<String> extract(String metricData) {
+    private List<String> extract(String metricData) {
         List<String> result = new ArrayList<>();
         Pattern pattern = Pattern.compile("\"instanceId\":\"([^\"]+)\",.*\"instance\":\"([^\"]+)\",.*\"projectId\":\"([^\"]+)\"");
         Matcher matcher = pattern.matcher(metricData);
