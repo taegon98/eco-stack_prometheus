@@ -88,8 +88,8 @@ public class InstanceMetricCollector implements MetricCollector{
                     StringBuilder message = new StringBuilder();
                     message.append("Instance ").append(i).append("\n");
                     message.append("instanceId: ").append(info.get(0)).append("\n");
-                    message.append("projectId: ").append(info.get(2)).append("\n");
-                    message.append("Hypervisor IP address: ").append(info.get(1)).append("\n");
+                    message.append("projectId: ").append(info.get(1)).append("\n");
+                    message.append("Hypervisor IP address: ").append(info.get(2)).append("\n");
                     message.append("Timestamp: ").append(formattedTime).append("\n");
                     message.append("CPU Utilization: ").append(cpuUtilization).append("%\n");
                     message.append("Memory Usage: ").append(memoryUsageInMB).append(" MB\n");
