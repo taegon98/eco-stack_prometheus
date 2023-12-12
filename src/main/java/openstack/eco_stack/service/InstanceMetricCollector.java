@@ -3,11 +3,14 @@ package openstack.eco_stack.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.aggregation.ArrayOperators;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 @Slf4j
@@ -75,12 +78,18 @@ public class InstanceMetricCollector implements MetricCollector{
                     ZonedDateTime dataCollectionTime = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(timestamp), ZoneId.of("UTC"));
                     String formattedTime = dataCollectionTime.withZoneSameInstant(ZoneId.of("Asia/Seoul")).toString();
 
+
                     double cpuUtilization = calculateCPUUtilization(valuesNodeCpu);
                     double memoryUsageInMB = calculateMemoryUsage(valuesNodeMemory);
                     double virtualCpuValue = calculateVirtualCpu(valuesNodeVirtualCpu);
 
+                    List<String> info = extract(resultCpu);
+
                     StringBuilder message = new StringBuilder();
                     message.append("Instance ").append(i).append("\n");
+                    message.append("instanceId: ").append(info.get(0)).append("\n");
+                    message.append("projectId: ").append(info.get(2)).append("\n");
+                    message.append("Hypervisor IP address: ").append(info.get(1)).append("\n");
                     message.append("Timestamp: ").append(formattedTime).append("\n");
                     message.append("CPU Utilization: ").append(cpuUtilization).append("%\n");
                     message.append("Memory Usage: ").append(memoryUsageInMB).append(" MB\n");
@@ -139,5 +148,29 @@ public class InstanceMetricCollector implements MetricCollector{
             }
         }
         return (validValues > 0) ? ((totalCPUTime / validValues) / prevCPUTime) * 100 : 0.0;
+    }
+
+
+    private static List<String> extract(String metricData) {
+        List<String> result = new ArrayList<>();
+        Pattern pattern = Pattern.compile("\"instanceId\":\"([^\"]+)\",.*\"instance\":\"([^\"]+)\",.*\"projectId\":\"([^\"]+)\"");
+        Matcher matcher = pattern.matcher(metricData);
+
+        String instanceId = null;
+        String projectId = null;
+        String instanceIp = null;
+
+        if (matcher.find()) {
+            instanceId = matcher.group(1);
+            projectId = matcher.group(2);
+            instanceIp = matcher.group(3);
+        } else {
+            log.info("Matcher not found for: " + metricData);
+        }
+        result.add(instanceId);
+        result.add(instanceIp);
+        result.add(projectId);
+
+        return result;
     }
 }
