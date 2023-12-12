@@ -21,7 +21,6 @@ import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;
 
-
 @RequiredArgsConstructor
 @Component
 @Slf4j
@@ -34,9 +33,8 @@ public class HypervisorMemoryCollector implements MetricCollector {
     private final CloudInstanceMetricRepository cloudInstanceMetricRepository;
 
     private final String metricType = "Memory Utilization";
-
-    private static final int NUMBER_OF_HYPERVISORS = 4;
-    private static final List<String> hypervisorIPs = Arrays.asList(
+    private final int NUMBER_OF_HYPERVISORS = 4;
+    private final List<String> hypervisorIPs = Arrays.asList(
             "192.168.0.36:9100", "192.168.0.28:9100", "192.168.0.87:9100", "192.168.0.96:9100");
 
     @Scheduled(fixedRate = 5000)

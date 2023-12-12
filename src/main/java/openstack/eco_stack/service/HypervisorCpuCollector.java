@@ -18,6 +18,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Component
@@ -30,8 +32,10 @@ public class HypervisorCpuCollector implements MetricCollector {
     private final HypervisorRepository hypervisorRepository;
     private final CloudInstanceMetricRepository cloudInstanceMetricRepository;
 
-    private static final String metricType = "CPU Utilization";
-    private static final int NUMBER_OF_CPU = 8;
+    private final String metricType = "CPU Utilization";
+    private final int NUMBER_OF_CPU = 8;
+    private final List<String> hypervisorIPs = Arrays.asList(
+            "192.168.0.36:9100", "192.168.0.28:9100", "192.168.0.87:9100", "192.168.0.96:9100");
 
     @Scheduled(fixedRate = 5000)
     @Scheduled(cron = "0 0 0 * * *")
@@ -39,12 +43,10 @@ public class HypervisorCpuCollector implements MetricCollector {
         RestTemplate restTemplate = new RestTemplate();
         MetricValues metricValues = MetricValues.builder().build();
 
-        String[] instances = {"192.168.0.36:9100", "192.168.0.28:9100", "192.168.0.87:9100", "192.168.0.96:9100"};
-
         ZonedDateTime endTime = ZonedDateTime.now();
         ZonedDateTime startTime = endTime.minusDays(1);
 
-        for (String instance : instances) {
+        for (String instance : hypervisorIPs) {
             for (ZonedDateTime currentTime = startTime; currentTime.isBefore(endTime); currentTime = currentTime.plusHours(1)) {
                 double totalUtilization = 0.0;
                 for (int cpuNumber = 0; cpuNumber < NUMBER_OF_CPU; cpuNumber++) {
