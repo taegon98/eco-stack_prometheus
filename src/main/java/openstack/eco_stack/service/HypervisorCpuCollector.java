@@ -65,7 +65,9 @@ public class HypervisorCpuCollector implements MetricCollector {
         saveMetric(metricValues);
     }
 
-    private double fetch(RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu, String instance) throws UnsupportedEncodingException {
+    private double fetch(
+            RestTemplate restTemplate, String prometheusUrl, long startTime, int cpu, String instance)
+            throws UnsupportedEncodingException {
         String query = "avg without (mode,cpu) (1 - rate(node_cpu_seconds_total{cpu=\"" + cpu + "\", instance=\"" + instance + "\", mode=\"idle\"}[1h]))";
         String encodedQuery = java.net.URLEncoder.encode(query, "UTF-8");
         URI uri;

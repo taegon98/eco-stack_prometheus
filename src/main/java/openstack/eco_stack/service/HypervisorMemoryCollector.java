@@ -6,11 +6,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import openstack.eco_stack.model.*;
 import openstack.eco_stack.repository.*;
-import openstack.eco_stack.service.MetricCollector;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -32,15 +36,12 @@ public class HypervisorMemoryCollector implements MetricCollector {
     private final String metricType = "Memory Utilization";
 
     private static final int NUMBER_OF_HYPERVISORS = 4;
-    private static final List<String> hypervisorIPs = Arrays.asList("192.168.0.36", "192.168.0.28", "192.168.0.87", "192.168.0.96");
+    private static final List<String> hypervisorIPs = Arrays.asList(
+            "192.168.0.36:9100", "192.168.0.28:9100", "192.168.0.87:9100", "192.168.0.96:9100");
 
-    public static void main(String[] args) {
-        collectMetric();
-    }
-
-    //@Scheduled(fixedRate = 5000)
-    //@Scheduled(cron = "0 0 0 * * *")
-    public static void collectMetric() {
+    @Scheduled(fixedRate = 5000)
+    @Scheduled(cron = "0 0 0 * * *")
+    public void collectMetric() {
         for (String ip : hypervisorIPs) {
             RestTemplate restTemplate = new RestTemplate();
             long endTime = ZonedDateTime.now().toEpochSecond();
@@ -48,51 +49,86 @@ public class HypervisorMemoryCollector implements MetricCollector {
             MetricValues metricValues = MetricValues.builder().build();
 
             while (startTime < endTime) {
-                double memoryUtilization = calculateHourlyMemoryUtilization(restTemplate, prometheusUrl, startTime);
+                double memoryUtilization = fetch(restTemplate, prometheusUrl, startTime, ip);
                 ZonedDateTime hour = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(startTime), ZoneId.systemDefault());
-                log.info("[{}] Memory Utilization: {}%", hour, memoryUtilization);
+                log.info("[{}] Memory Utilization for Hypervisor IP {}: {}%", hour, ip, memoryUtilization);
 
                 MetricValue metricValue = MetricValue.builder()
                         .dateTime(hour.toInstant())
                         .value(memoryUtilization)
                         .build();
                 metricValues.add(metricValue);
-
                 startTime += 3600;
             }
-
-            // saveMetric(ip, metricValues);
+            saveMetric(metricValues);
         }
     }
 
+    private double fetch(RestTemplate restTemplate, String prometheusUrl, long startTime, String instance) {
+        String query, encodedQuery;
+        URI uri;
 
-    private static double calculateHourlyMemoryUtilization(RestTemplate restTemplate, String prometheusUrl, long startTime) {
-        String memFreeQuery = prometheusUrl + "/api/v1/query?" +
-                "query=avg_over_time(node_memory_MemFree_bytes[60m])" +
-                "&time=" + startTime;
-        String memCachedQuery = prometheusUrl + "/api/v1/query?" +
-                "query=avg_over_time(node_memory_Cached_bytes[60m])" +
-                "&time=" + startTime;
-        String memBuffersQuery = prometheusUrl + "/api/v1/query?" +
-                "query=avg_over_time(node_memory_Buffers_bytes[60m])" +
-                "&time=" + startTime;
-        String memTotalQuery = prometheusUrl + "/api/v1/query?" +
-                "query=avg_over_time(node_memory_MemTotal_bytes[60m])" +
-                "&time=" + startTime;
+        ResponseEntity<String> response;
+        try {
+            query = "avg_over_time(node_memory_MemFree_bytes{instance=\"" + instance + "\"}[60m])";
+            encodedQuery = URLEncoder.encode(query, "UTF-8");
 
-        double memFree = extractValue(restTemplate.getForEntity(memFreeQuery, String.class));
-        double memCached = extractValue(restTemplate.getForEntity(memCachedQuery, String.class));
-        double memBuffers = extractValue(restTemplate.getForEntity(memBuffersQuery, String.class));
-        double memTotal = extractValue(restTemplate.getForEntity(memTotalQuery, String.class));
+            try {
+                uri = new URI(prometheusUrl + "/api/v1/query?query=" + encodedQuery + "&time=" + startTime);
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+                return 0.0;
+            }
+            response = restTemplate.getForEntity(uri, String.class);
+            double memFree = extract(response);
 
-        double memoryUtilization = calculateMemoryUtilization(memFree, memCached, memBuffers, memTotal);
 
-//        log.info("Memory Free: {}, Memory Cached: {}, Memory Buffers: {}, Memory Total: {}", memFree, memCached, memBuffers, memTotal);
+            query = "avg_over_time(node_memory_Cached_bytes{instance=\"" + instance + "\"}[60m])";
+            encodedQuery = URLEncoder.encode(query, "UTF-8");
+            try {
+                uri = new URI(prometheusUrl + "/api/v1/query?query=" + encodedQuery + "&time=" + startTime);
+                response = restTemplate.getForEntity(uri, String.class);
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+                return 0.0;
+            }
+            double memCached = extract(response);
 
-        return memoryUtilization;
+
+            query = "avg_over_time(node_memory_Buffers_bytes{instance=\"" + instance + "\"}[60m])";
+            encodedQuery = URLEncoder.encode(query, "UTF-8");
+            try {
+                uri = new URI(prometheusUrl + "/api/v1/query?query=" + encodedQuery + "&time=" + startTime);
+                response = restTemplate.getForEntity(uri, String.class);
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+                return 0.0;
+            }
+            double memBuffers = extract(response);
+
+
+            query = "avg_over_time(node_memory_MemTotal_bytes{instance=\"" + instance + "\"}[60m])";
+            encodedQuery = URLEncoder.encode(query, "UTF-8");
+            try {
+                uri = new URI(prometheusUrl + "/api/v1/query?query=" + encodedQuery + "&time=" + startTime);
+                response = restTemplate.getForEntity(uri, String.class);
+            } catch (URISyntaxException e) {
+                e.printStackTrace();
+                return 0.0;
+            }
+
+            double memTotal = extract(response);
+
+            double memoryUtilization = calculateMemoryUtilization(memFree, memCached, memBuffers, memTotal);
+
+            return memoryUtilization;
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+            return 0.0;
+        }
     }
 
-    private static double extractValue(ResponseEntity<String> response) {
+    private double extract(ResponseEntity<String> response) {
         if (response.getStatusCode().is2xxSuccessful()) {
             String result = response.getBody();
             ObjectMapper objectMapper = new ObjectMapper();
@@ -116,7 +152,7 @@ public class HypervisorMemoryCollector implements MetricCollector {
         return 0;
     }
 
-    private static double calculateMemoryUtilization(double memFree, double memCached, double memBuffers, double memTotal) {
+    private double calculateMemoryUtilization(double memFree, double memCached, double memBuffers, double memTotal) {
         return 100 * (1 - ((memFree + memCached + memBuffers) / memTotal));
     }
 
@@ -130,37 +166,36 @@ public class HypervisorMemoryCollector implements MetricCollector {
 
         HypervisorInstanceMetric savedInstanceMetric = hypervisorInstanceMetricRepository.save(instanceMetric);
 
-//        CloudInstanceMetric cloudInstanceMetric = CloudInstanceMetric.builder()
-//                .name(metricType)
-//                .date(LocalDate.now(seoulZoneId))
-//                .metricValues(metricValues)
-//                .build();
-//        cloudInstanceMetric = cloudInstanceMetricRepository.save(cloudInstanceMetric);
-
+        CloudInstanceMetric cloudInstanceMetric = CloudInstanceMetric.builder()
+                .name(metricType)
+                .date(LocalDate.now(seoulZoneId))
+                .metricValues(metricValues)
+                .build();
+        cloudInstanceMetric = cloudInstanceMetricRepository.save(cloudInstanceMetric);
         //TODO: Save Instance
-//        String cloudInstanceId = "Instance 1";
-//        CloudInstance cloudInstance = cloudInstanceRepository.findById(cloudInstanceId)
-//                .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).createdDate(LocalDate.now(seoulZoneId)).build());
-//
-//        cloudInstance.addToHypervisorMemoryUtilizationMetricIds(savedInstanceMetric.getId());
-//        cloudInstance.addToMemoryUtilizationMetricIds(cloudInstanceMetric.getId());
-//        cloudInstance = cloudInstanceRepository.save(cloudInstance);
-//
-//        //TODO: Save Project
-//        String cloudProjectId = "CloudProject 1";
-//        CloudProject cloudProject = cloudProjectRepository.findById(cloudProjectId)
-//                .orElseGet(() -> CloudProject.builder().id(cloudProjectId).createdDate(LocalDate.now(seoulZoneId)).build());
-//
-//        cloudProject.addToCloudInstanceIds(cloudInstance.getId());
-//        cloudProjectRepository.save(cloudProject);
-//
-//        //TODO: Save Hypervisor
-//        String hypervisorId = "Hypervisor 1";
-//        Hypervisor hypervisor = hypervisorRepository.findById(hypervisorId)
-//                .orElseGet(() -> Hypervisor.builder().id(hypervisorId).createdDate(LocalDate.now(seoulZoneId)).build());
-//
-//        hypervisor.addToCloudInstanceIds(cloudInstance.getId());
-//        hypervisorRepository.save(hypervisor);
+        String cloudInstanceId = "Instance 1";
+        CloudInstance cloudInstance = cloudInstanceRepository.findById(cloudInstanceId)
+                .orElseGet(() -> CloudInstance.builder().id(cloudInstanceId).createdDate(LocalDate.now(seoulZoneId)).build());
+
+        cloudInstance.addToHypervisorMemoryUtilizationMetricIds(savedInstanceMetric.getId());
+        cloudInstance.addToMemoryUtilizationMetricIds(cloudInstanceMetric.getId());
+        cloudInstance = cloudInstanceRepository.save(cloudInstance);
+
+        //TODO: Save Project
+        String cloudProjectId = "CloudProject 1";
+        CloudProject cloudProject = cloudProjectRepository.findById(cloudProjectId)
+                .orElseGet(() -> CloudProject.builder().id(cloudProjectId).createdDate(LocalDate.now(seoulZoneId)).build());
+
+        cloudProject.addToCloudInstanceIds(cloudInstance.getId());
+        cloudProjectRepository.save(cloudProject);
+
+        //TODO: Save Hypervisor
+        String hypervisorId = "Hypervisor 1";
+        Hypervisor hypervisor = hypervisorRepository.findById(hypervisorId)
+                .orElseGet(() -> Hypervisor.builder().id(hypervisorId).createdDate(LocalDate.now(seoulZoneId)).build());
+
+        hypervisor.addToCloudInstanceIds(cloudInstance.getId());
+        hypervisorRepository.save(hypervisor);
 
         log.info("Save Memory Metric");
     }
